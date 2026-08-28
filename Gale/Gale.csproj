@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Antlr4" Version="4.6.6">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+      <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+      <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="ANTLR4\" />
+      <Folder Include="Compiler\SourceFile\" />
+    </ItemGroup>
+
+</Project>
