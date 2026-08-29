@@ -18,33 +18,25 @@ public class QualifiedType : TypeName
 
 public abstract class Type : AstNode { }
 
-public class NamedType : Type
+public class NamedType(TypeName typeName) : Type
 {
-    public TypeName TypeName { get; }
-    public NamedType(TypeName typeName) => TypeName = typeName;
+    public TypeName TypeName { get; } = typeName;
 }
 
-public class ArrayType : Type
+public class ArrayType(Expression length, Type elementType) : Type
 {
-    public Expression Length { get; }
-    public Type ElementType { get; }
-    public ArrayType(Expression length, Type elementType)
-    {
-        Length = length;
-        ElementType = elementType;
-    }
+    public Expression Length { get; } = length;
+    public Type ElementType { get; } = elementType;
 }
 
-public class StructType : Type
+public class StructType(StructTypeData data) : Type
 {
-    public StructTypeData Data { get; }
-    public StructType(StructTypeData data) => Data = data;
+    public StructTypeData Data { get; } = data;
 }
 
-public class PointerType : Type
+public class PointerType(Type baseType) : Type
 {
-    public Type BaseType { get; }
-    public PointerType(Type baseType) => BaseType = baseType;
+    public Type BaseType { get; } = baseType;
 }
 
 public class FunctionType : Type { }

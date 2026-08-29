@@ -36,7 +36,7 @@ public class ResultType(Type type) : FunctionResult
     public Type Type { get; } = type;
 }
 
-public class Parameter(List<string> identifiers, Type parameterType)
+public class Parameter(List<string> identifiers, Type parameterType) : AstNode
 {
     public List<string> Identifiers { get; } = identifiers ?? new List<string>();
     public Type ParameterType { get; } = parameterType;
