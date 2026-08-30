@@ -20,6 +20,7 @@
     <ItemGroup>
       <Folder Include="ANTLR4\" />
       <Folder Include="Compiler\SourceFile\" />
+      <Folder Include="Types\" />
     </ItemGroup>
 
 </Project>
