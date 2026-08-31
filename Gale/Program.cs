@@ -43,7 +43,7 @@ class Program
             assembly.MainModule.TypeSystem.Object);
 
         var Gale = new GaleGenerator(assembly);
-        Gale.AddFunctionToPackage(mainProgram, new FunctionAst(){Identifier = "main"});
+        Gale.AddFunctionToPackage(mainProgram, new FunctionAst(){Identifier = "main", Body = (BlockAst)ast});
     }
 
     public static void PrintIParseTree(IParseTree root, int tabs = 0)

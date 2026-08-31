@@ -10,26 +10,23 @@ public class GaleVisitor : GoParserBaseVisitor<AstNode>
    {
       var decls = context.functionDecl()[0];
       var block = decls.block();
-      VisitBlock(block);
+      return VisitBlock(block);
       return base.VisitSourceFile(context);
    }
 
    public override AstNode VisitBlock(GoParser.BlockContext context)
    {
-      var statements = context.statementList();
+      //var statements = context.statementList();
       //var semi = statements.SEMI();
-      var t = statements.statement();
-      VisitStatementList(statements);
-      return base.VisitBlock(context);
-   }
-
-   public override AstNode VisitStatementList(GoParser.StatementListContext context)
-   {
-      foreach (var stmt in context.statement())
+      var statements = context.statementList().statement();
+      //VisitStatementList(statements);
+      var block = new BlockAst();
+      foreach (var statement in statements)
       {
-         VisitStatement(stmt);
+         block.Statements.Add((StatementAst)VisitStatement(statement));
       }
-      return base.VisitStatementList(context);
+      return block;
+      //return base.VisitBlock(context);
    }
 
    public override AstNode VisitStatement(GoParser.StatementContext context)
@@ -63,7 +60,7 @@ public class GaleVisitor : GoParserBaseVisitor<AstNode>
          return VisitDeclaration(declaration);
       }
       
-      return base.VisitStatement(context);
+      return new ExpressionAst();
    }
 
    public override AstNode VisitSimpleStmt(GoParser.SimpleStmtContext context)
@@ -76,16 +73,6 @@ public class GaleVisitor : GoParserBaseVisitor<AstNode>
          return VisitShortVarDecl(shortVarDecl);
       }
       return base.VisitSimpleStmt(context);
-   }
-
-   public override AstNode VisitShortVarDecl(GoParser.ShortVarDeclContext context)
-   {
-      //var shortval = context.DECLARE_ASSIGN();
-      var d = context.identifierList();
-      var g = context.expressionList();
-      
-      
-      return base.VisitShortVarDecl(context);
    }
 
    public override AstNode VisitExpression(GoParser.ExpressionContext context)
@@ -109,9 +96,22 @@ public class GaleVisitor : GoParserBaseVisitor<AstNode>
 
    public override AstNode VisitVarDecl(GoParser.VarDeclContext context)
    {
-      var v = context.varSpec();
-      
+      var varSpecs = context.varSpec()[0];
+      if (varSpecs is not null) return VisitVarSpec(varSpecs);
       return base.VisitVarDecl(context);
+   }
+
+   public override AstNode VisitVarSpec(GoParser.VarSpecContext context)
+   {
+      var identifiers = context.identifierList().IDENTIFIER(0).GetText();
+      var expressions = context.expressionList();
+      var type = context.type_().typeName().IDENTIFIER().GetText();
+
+      var varDeclarationAst = new VarDeclarationAst();
+      varDeclarationAst.Identifier = identifiers;
+      varDeclarationAst.TypeName = type;
+      varDeclarationAst.Expression = new ExpressionAst();
+      return varDeclarationAst;
    }
 
    public override AstNode VisitFunctionDecl(GoParser.FunctionDeclContext context)
