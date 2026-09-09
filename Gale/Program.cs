@@ -1,9 +1,7 @@
 ﻿using System.Diagnostics;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using Gale.Ast;
-using Gale.Compiler;
-using Gale.Semantic;
+using Gale.AST;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
@@ -22,12 +20,14 @@ class Program
         var lexer = new GoLexer(stream);
         var tokens = new CommonTokenStream(lexer);
         var parser = new GoParser(tokens);
+          
+        //var lexed = new GoLexer()
         IParseTree tree = parser.sourceFile();
 
         Console.WriteLine(tree.GetText());
         PrintIParseTree(tree);
-        var gale = new GaleVisitor();
-        var ast = gale.VisitSourceFile((GoParser.SourceFileContext)tree);
+        var astBuilder = new GaleAstBuilder();
+        var ast = astBuilder.VisitSourceFile((GoParser.SourceFileContext)tree);
         
         var mp = new ModuleParameters
         {
@@ -41,9 +41,9 @@ class Program
         var mainProgram = new TypeDefinition("main", "Program", 
             TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, 
             assembly.MainModule.TypeSystem.Object);
-
-        var Gale = new GaleGenerator(assembly);
-        Gale.AddFunctionToPackage(mainProgram, new FunctionAst(){Identifier = "main", Body = (BlockAst)ast});
+        
+        //var Gale = new GaleGenerator(assembly);
+        //Gale.AddFunctionToPackage(mainProgram, new FunctionAst(){Identifier = "main", Body = (BlockAst)ast});
     }
 
     public static void PrintIParseTree(IParseTree root, int tabs = 0)

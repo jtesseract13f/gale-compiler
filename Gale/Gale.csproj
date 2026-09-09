@@ -19,8 +19,7 @@
 
     <ItemGroup>
       <Folder Include="ANTLR4\" />
-      <Folder Include="Compiler\SourceFile\" />
-      <Folder Include="Types\" />
+      <Folder Include="CodeGeneration\" />
     </ItemGroup>
 
 </Project>
