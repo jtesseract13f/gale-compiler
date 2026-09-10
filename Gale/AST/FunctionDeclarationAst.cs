@@ -1,9 +1,19 @@
 namespace Gale.AST;
 
+
+public class SourceFileAst : AstNode
+{
+    public List<FunctionDeclarationAst> Functions { get; set; } = new();
+    public List<string> Packages { get; set; } = new();
+    public string ModuleName { set; get; }
+    public FunctionDeclarationAst? Main { get; set; }
+}
 public class FunctionDeclarationAst : AstNode
 {
+    public string Name { get; set; }
     public BlockAst? Block { get; set; }
     public List<ParameterAst> Parameters { get; set; } = new List<ParameterAst>();
+    public string ReturnType { get; set; } = "void";
 }
 
 public class BlockAst : AstNode
@@ -34,8 +44,8 @@ public class MassAssigmentStatementAst : StatementAst
 
 public class AssigmentStatementAst : StatementAst
 {
-    public string Identifier { get; set; }
-    public List<ExpressionAst> Expressions { get; set; } = new List<ExpressionAst>();
+    public IdentifierAst Identifier { get; set; }
+    public ExpressionAst Expression { get; set; }
 }
 
 public class DeclarationStatementAst : StatementAst

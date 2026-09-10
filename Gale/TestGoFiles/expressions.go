@@ -3,8 +3,11 @@ package main
 import "fmt"
 
 func main(){
-    var uno int = 2
+    
+
+    var uno int = 2 + 3 - 1
     var f, h int = 12, 33
+    f, h = 12, 13
     //f = 13 + 2
     //fmt.Println(2 + 3)
     //var f float = 1.3 + 1

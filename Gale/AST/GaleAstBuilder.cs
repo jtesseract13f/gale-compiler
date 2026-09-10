@@ -1,3 +1,4 @@
+using Antlr4.Runtime.Tree;
 using Gale.Helpers;
 
 namespace Gale.AST;
@@ -8,17 +9,47 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
 {
     public override AstNode VisitSourceFile(GoParser.SourceFileContext context)
     {
+        var sourceAst = new SourceFileAst();
         var functions = context.functionDecl();
-        var mainFunction = new FunctionDeclarationAst();
-        
+        //var mainFunction = new FunctionDeclarationAst();
+        sourceAst.ModuleName = context.packageClause().packageName().identifier().IDENTIFIER().GetText();
         foreach (var function in functions)
         {
+            var func = new FunctionDeclarationAst();
             var block = function.block();
             var blockAst = (BlockAst)VisitBlock(block);
-            var functionAst = VisitFunctionDecl(function);
-            return blockAst;
+            func.Block = blockAst;
+            func.Name = function.IDENTIFIER().GetText();
+            //function.signature();
+            var parameters = function.signature()?.parameters().parameterDecl();
+            foreach (var parameter in parameters)
+            {
+                var identifiers = parameter.identifierList().IDENTIFIER();
+                var type = parameter.type_();
+                foreach (var id in identifiers)
+                {
+                    var parameterAst = new ParameterAst(){
+                        Name = id.GetText(), 
+                        Type = type.typeName().IDENTIFIER().GetText()};
+                    func.Parameters.Add(parameterAst);
+                }
+            }
+            var result = function?.signature()?.result()?.type_()?.typeName();
+            if (result != null)
+            {
+                var returnType =  function.signature()?.result().type_().typeName().IDENTIFIER().GetText() ?? "void";
+                func.ReturnType = returnType;
+                var qualifiedIdent = function.signature()?.result()?.type_()?.typeName()?.qualifiedIdent()?.IDENTIFIER() ?? [];
+                foreach (var terminal in qualifiedIdent) { }
+            }
+            
+            if (func.Name  == "main")
+            {
+                sourceAst.Main = func;
+            }
+            sourceAst.Functions.Add(func);
         }
-        return base.VisitSourceFile(context);
+        return sourceAst;
     }
 
     public override AstNode VisitBlock(GoParser.BlockContext context)
@@ -106,23 +137,15 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         {
             var expressions = assignment.expressionList();
             var assigmentsAst = new MassAssigmentStatementAst();
+            var right = expressions[0].expression();
+            var left = expressions[1].expression();
 
-            foreach (var expressionList in expressions)
+            for (int i = 0; i < right.Length; ++i)
             {
-                var assigmentAst = new AssigmentStatementAst();
-                var assignOp = assignment.assign_op();
-                //assignment.
-                if (assignOp.ASSIGN() != null)
-                {
-                    //assignOp.
-                }
-                assignOp.ASSIGN();
-                foreach (var expression in expressionList.expression())
-                {
-                    VisitExpression(expression);
-                    //var primaryExpr = expression.primaryExpr();
-                    //expression.
-                }
+                var assignmentAst = new AssigmentStatementAst();
+                assignmentAst.Identifier = (IdentifierAst)VisitExpression(right[i]);
+                assignmentAst.Expression = (ExpressionAst)VisitExpression(left[i]);
+                assigmentsAst.Assigments.Add(assignmentAst);
             }
 
             return assigmentsAst;

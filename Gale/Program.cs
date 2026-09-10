@@ -2,6 +2,7 @@
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Gale.AST;
+using Gale.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
@@ -9,11 +10,11 @@ using Mono.Cecil;
 
 namespace Gale;
 
+
 class Program
 {
     static async Task Main(string[] args)
     {
-        
         //String input = "your text to parse here";
         var file = "/home/jtesseract13f/Projects/Gale/Gale/TestGoFiles/expressions.go";
         var stream = CharStreams.fromPath(file);
@@ -34,6 +35,8 @@ class Program
             Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture ==  System.Runtime.InteropServices.Architecture.Arm64 ? TargetArchitecture.ARM64 : TargetArchitecture.AMD64,
             Kind =  ModuleKind.Console
         };
+
+        var gale = new GaleGenerator(mp, "Filename.exe");
 
         var assembly = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("Foo", Version.Parse("1.0.0.0")),
             Path.GetFileName("Foo.dll"), mp);
