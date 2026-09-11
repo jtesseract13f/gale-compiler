@@ -7,11 +7,11 @@ public abstract class AstNode;
 
 public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
 {
+    
     public override AstNode VisitSourceFile(GoParser.SourceFileContext context)
     {
         var sourceAst = new SourceFileAst();
         var functions = context.functionDecl();
-        //var mainFunction = new FunctionDeclarationAst();
         sourceAst.ModuleName = context.packageClause().packageName().identifier().IDENTIFIER().GetText();
         foreach (var function in functions)
         {
@@ -20,8 +20,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
             var blockAst = (BlockAst)VisitBlock(block);
             func.Block = blockAst;
             func.Name = function.IDENTIFIER().GetText();
-            //function.signature();
-            var parameters = function.signature()?.parameters().parameterDecl();
+            var parameters = function.signature()?.parameters().parameterDecl() ?? [];
             foreach (var parameter in parameters)
             {
                 var identifiers = parameter.identifierList().IDENTIFIER();
@@ -37,15 +36,16 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
             var result = function?.signature()?.result()?.type_()?.typeName();
             if (result != null)
             {
-                var returnType =  function.signature()?.result().type_().typeName().IDENTIFIER().GetText() ?? "void";
+                var returnType =  function?.signature()?.result().type_().typeName().IDENTIFIER().GetText() ?? "void";
                 func.ReturnType = returnType;
-                var qualifiedIdent = function.signature()?.result()?.type_()?.typeName()?.qualifiedIdent()?.IDENTIFIER() ?? [];
+                var qualifiedIdent = function?.signature()?.result()?.type_()?.typeName()?.qualifiedIdent()?.IDENTIFIER() ?? [];
                 foreach (var terminal in qualifiedIdent) { }
             }
             
             if (func.Name  == "main")
             {
                 sourceAst.Main = func;
+                continue;
             }
             sourceAst.Functions.Add(func);
         }
@@ -75,6 +75,12 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var simpleStmt = context.simpleStmt();
         if (simpleStmt != null) return VisitSimpleStmt(simpleStmt);
         
+        var returnStmt = context.returnStmt();
+        if (returnStmt != null)
+        {
+            return VisitReturnStmt(returnStmt);
+        }
+        
         var ifStmt = context.ifStmt();
         var forStmt = context.forStmt();
         var labeledStmt = context.labeledStmt();
@@ -82,7 +88,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var goStmt = context.goStmt();
         var gotoStmt = context.gotoStmt();
         
-        var returnStmt = context.returnStmt();
+        
         var breakStmt = context.breakStmt();
         var continueStmt = context.continueStmt();
         var selectStmt = context.selectStmt();
@@ -90,6 +96,16 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var deferStmt = context.deferStmt();
         
         return base.VisitStatement(context);
+    }
+
+    public override AstNode VisitReturnStmt(GoParser.ReturnStmtContext context)
+    {
+        var expressions = context?.expressionList()?.expression() ??[];
+        if (expressions.Length == 0) return new ReturnStatementAst() { IsNoReturn = true };
+
+        return new ReturnStatementAst() { IsNoReturn = false, 
+            ReturnedExpression = (ExpressionAst)VisitExpression(expressions[0]) };
+        return base.VisitReturnStmt(context);
     }
 
     public override AstNode VisitDeclaration(GoParser.DeclarationContext context)
@@ -142,6 +158,8 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
 
             for (int i = 0; i < right.Length; ++i)
             {
+                //var assigmentOp = assignment.assign_op();
+                //assigmentOp.
                 var assignmentAst = new AssigmentStatementAst();
                 assignmentAst.Identifier = (IdentifierAst)VisitExpression(right[i]);
                 assignmentAst.Expression = (ExpressionAst)VisitExpression(left[i]);
@@ -158,7 +176,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         }
         var sendStmt = context.sendStmt();
         var shortVarDecl = context.shortVarDecl();
-        
+        var incrementOp = context.incDecStmt();
         return base.VisitSimpleStmt(context);
     }
 
@@ -170,31 +188,25 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
             var primary = VisitPrimaryExpr(primaryExpr);
             return primary;
         }
-
-        var binaryExpression = new BinaryExpressionAst();
-        if (context.MINUS() != null)
-        {
-            binaryExpression.Operation = BinaryExpressionType.Minus;
-        } else if(context.PLUS() != null)
-        {
-            binaryExpression.Operation = BinaryExpressionType.Plus;
-        }
-        
-        context.DIV();
-        context.AMPERSAND();
-        context.EQUALS();
-        context.EXCLAMATION();
-        context.STAR();
         
         var expressions = context.expression();
         if (expressions.Length == 2)
         {
+            var binaryExpression = new BinaryExpressionAst();
+            binaryExpression.Operation = GetBinaryExpressionType(context);
             var left = VisitExpression(expressions[0]);
             var right = VisitExpression(expressions[1]);
-            binaryExpression.LeftOperand = (ExpressionAst)VisitExpression(expressions[0]);
-            binaryExpression.RightOperand = (ExpressionAst)VisitExpression(expressions[1]);
+            binaryExpression.LeftOperand = (ExpressionAst)left;
+            binaryExpression.RightOperand = (ExpressionAst)right;
+            
+            return binaryExpression;
         }
-        return binaryExpression;
+        else if (expressions.Length == 1)
+        {
+            var unary = VisitExpression(expressions[0]);
+        }
+
+        throw new Exception($"Undefined expression {context.GetText()}");
     }
 
     public override AstNode VisitPrimaryExpr(GoParser.PrimaryExprContext context)
@@ -202,7 +214,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var operand = context.operand();
         ExpressionAst operandAst = null;
         var arguments = context.arguments();
-        context.methodExpr();
+        var method = context.methodExpr();
         context.conversion();
         context.typeAssertion();
         context.index();
@@ -213,7 +225,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
             operandAst = (ExpressionAst)VisitOperand(operand);
             if (arguments.Length == 0) return operandAst;
         }
-        
+        //TODO: fmt error
         var funcAst = new FunctionCallAst();
         if (arguments.Length > 0)
         {
@@ -278,8 +290,59 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
             return new IntegerLiteral() { Value = IntegerParseHelper.ParseInteger(integerLit) }; // NEED CONVERTOR
         }
         var stringContext = context.string_();
+        if (stringContext != null)
+        {
+            return new StringLiteral() { Value = stringContext?.INTERPRETED_STRING_LIT().GetText() ?? "" };
+        }
         var nilLit = context.NIL_LIT();
         var floatLit = context.FLOAT_LIT();
         return base.VisitBasicLit(context);
+    }
+
+    private BinaryExpressionType GetBinaryExpressionType(GoParser.ExpressionContext context)
+    {
+        if (context.MINUS() != null)
+            return BinaryExpressionType.Minus;
+        else if (context.PLUS() != null)
+            return BinaryExpressionType.Plus;
+        else if (context.STAR() != null)
+            return BinaryExpressionType.Mul;
+        else if (context.DIV() != null)
+            return BinaryExpressionType.Div;
+        else if (context.MOD() != null)
+            return BinaryExpressionType.Mod;
+
+        else if (context.AMPERSAND() != null)
+            return BinaryExpressionType.BitwiseAnd;
+        else if (context.OR() != null)
+            return BinaryExpressionType.BitwiseOr;
+
+        else if (context.LSHIFT() != null)
+            return BinaryExpressionType.LShift;
+        else if (context.RSHIFT() != null)
+            return BinaryExpressionType.RShift;
+
+        else if (context.NOT_EQUALS() != null)
+            return BinaryExpressionType.NotEquals;
+        else if (context.EQUALS() != null)
+            return BinaryExpressionType.Equals;
+        else if (context.LESS_OR_EQUALS() != null)
+            return BinaryExpressionType.LessOrEquals;
+        else if (context.GREATER_OR_EQUALS() != null)
+            return BinaryExpressionType.GreaterOrEquals;
+        else if (context.LESS() != null)
+            return BinaryExpressionType.Less;
+        else if (context.GREATER() != null)
+            return BinaryExpressionType.Greater;
+
+        else if (context.LOGICAL_AND() != null)
+            return BinaryExpressionType.LogicalAnd;
+        else if (context.LOGICAL_OR() != null)
+            return BinaryExpressionType.LogicalOr;
+
+        else if (context.RECEIVE() != null)
+            return BinaryExpressionType.Receive;
+        else
+            throw new Exception($"Unknown binary operator at {context.Start}");
     }
 }

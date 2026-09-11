@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Gale.AST;
+using Gale.Helpers;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.CompilerServices.SymbolWriter;
@@ -9,6 +10,7 @@ namespace Gale.CodeGeneration;
 public class FunctionSymbol
 {
     public string Identifier { get; set; }
+    public string ReturnedType { get; set; }
     public MethodDefinition? Method { get; set; }
 }
 
@@ -23,6 +25,7 @@ public class VariableSymbol
 public class GaleGenerator
 {
     private ModuleParameters _moduleParameters;
+    private TypeDefinition _mainModule;
     private AssemblyDefinition _assembly;
     //PACKAGE FUNCTIONS TABLE
     private Dictionary<string, FunctionSymbol> _functionSymbols = new();
@@ -34,32 +37,62 @@ public class GaleGenerator
             Path.GetFileName(filename), _moduleParameters);
     }
     
-    public void GenerateProgram(SourceFileAst root)
+    public AssemblyDefinition GenerateProgram(SourceFileAst root)
     {
-        //GENERATE MAIN MODULE TO PROGRAM CLASS
-        //GENERATE STATIC METHODS FOR FUNCTIONS
-        //GENERATE MAIN METHOD
+        _mainModule = new TypeDefinition(root.ModuleName, "Program", 
+            TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, 
+            _assembly.MainModule.TypeSystem.Object);
+        _assembly.MainModule.Types.Add(_mainModule);
+
+        foreach (var func in root.Functions)
+        {
+            var funcDefinition = new MethodDefinition(func.Name, 
+                MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, 
+                func.ReturnType.GetTypeReference(_assembly));
+            _mainModule.Methods.Add(funcDefinition);
+            var funcSymbol = new FunctionSymbol()
+            {
+                Identifier = func.Name,
+                Method = funcDefinition,
+                ReturnedType = func.ReturnType
+            };
+            _functionSymbols[func.Name] = funcSymbol;
+        }
+
+        foreach (var func in root.Functions)
+        {
+            GenerateMethodBodyFromFunction(_functionSymbols[func.Name].Method, func);
+        }
         if (root.Main != null)
         {
-            var program = new TypeDefinition(root.ModuleName, "Program", 
-                TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, 
-                _assembly.MainModule.TypeSystem.Object);
-            var mainDefinition = GenerateMethodFromFunction("Main", root.Main);
-            program.Methods.Add(mainDefinition);
+            var mainDefinition = new MethodDefinition("Main", 
+                MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, 
+                _assembly.MainModule.TypeSystem.Void);
+            _mainModule.Methods.Add(mainDefinition);
+            GenerateMethodBodyFromFunction(mainDefinition, root.Main);
+            _assembly.EntryPoint = mainDefinition;
+            //ADD DEFAULT CONSTRUCTOR FOR PROGRAM CLASS
+            var ctor_Program_10 = new MethodDefinition(".ctor", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName, _assembly.MainModule.TypeSystem.Void);
+            _mainModule.Methods.Add(ctor_Program_10);
+            var il_ctor_Program_11 = ctor_Program_10.Body.GetILProcessor();
+            il_ctor_Program_11.Emit(OpCodes.Ldarg_0);
+            il_ctor_Program_11.Emit(OpCodes.Call, _assembly.MainModule
+                .ImportReference(TypeHelpers.DefaultCtorFor(_mainModule.BaseType)));
+            il_ctor_Program_11.Emit(OpCodes.Ret);
+            _assembly.EntryPoint = mainDefinition;
         }
+        return _assembly;
     }
 
-    public MethodDefinition GenerateMethodFromFunction(string name, FunctionDeclarationAst funcAst)
+    public void GenerateMethodBodyFromFunction(MethodDefinition definition, FunctionDeclarationAst funcAst)
     {
-        var methodDefinition = new MethodDefinition(name, 
-            MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, 
-            _assembly.MainModule.TypeSystem.Void);
-        methodDefinition.Body.InitLocals = true;
-        var ilBody = methodDefinition.Body.GetILProcessor();
+        definition.Body.InitLocals = true;
+        var ilBody = definition.Body.GetILProcessor();
         var symbolTable = new Dictionary<string, VariableSymbol>();
-        GenerateBlock(funcAst.Block, ilBody, methodDefinition, symbolTable);
+        GenerateBlock(funcAst.Block, ilBody, definition, symbolTable);
+
         ilBody.Emit(OpCodes.Ret);
-        return methodDefinition;
+        //return methodDefinition;
     }
 
     public void GenerateBlock(BlockAst block, ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
@@ -78,15 +111,26 @@ public class GaleGenerator
                     GenerateMassAssigment(massAssigment, ilBody, method, symbols);
                     break;
                 }
-                case MassDeclarationStatementAst:
+                case MassDeclarationStatementAst massDeclaration:
                 {
+                    GenerateMassDeclaration(massDeclaration, ilBody, method, symbols);
                     break;
                 }
-                case ExpressionStatementAst:
+                case DeclarationStatementAst declaration:
+                    GenerateDeclaration(declaration, ilBody, method, symbols);
+                    break;
+                case ExpressionStatementAst expression:
                 {
+                    GenerateExpression(expression.ExpressionAst, ilBody, method, symbols);
+                    break;
+                }
+                case ReturnStatementAst returnExpression:
+                {
+                    if (!returnExpression.IsNoReturn) GenerateExpression(returnExpression.ReturnedExpression, ilBody, method, symbols);
                     break;
                 }
                 default:
+                    throw new Exception($"Unknown statement {statement.GetType()}");
                     break;
             }
             //GenerateSimpleStatement(ilBody, method, symbols);
@@ -102,7 +146,8 @@ public class GaleGenerator
         }
     }
     
-    public void GenerateAssigment(AssigmentStatementAst assigmentStmt, ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    public void GenerateAssigment(AssigmentStatementAst assigmentStmt, 
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
         GenerateExpression(assigmentStmt.Expression, ilBody, method, symbols);
         var varSymbol = symbols[assigmentStmt.Identifier.Name];//TODO: add check
@@ -115,12 +160,52 @@ public class GaleGenerator
         switch (expression)
         {
             case IntegerLiteral literal:
-                ilBody.Emit(OpCodes.Ldc_I4, literal.Value);
+                ilBody.Emit(OpCodes.Ldc_I4, (int)literal.Value);
+                break;
+            case StringLiteral literal:
+                ilBody.Emit(OpCodes.Ldstr, literal.Value);
                 break;
             case BinaryExpressionAst binary:
                 GenerateBinaryExpression(binary, ilBody, method, symbols);
                 break;
+            case FunctionCallAst call:
+            {
+                GenerateFunctionCall(call, ilBody, method, symbols);
+                break;
+            }
+            case IdentifierAst identifier:
+            {
+                GenerateIdentifier(identifier, ilBody, method, symbols);
+                break;
+            } 
+            //UNARY EXPRESSION
         }
+    }
+
+    public void GenerateIdentifier(IdentifierAst identifier,
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        symbols.TryGetValue(identifier.Name, out var symbol);
+        if (symbol == null) throw new Exception("Unknown Variable");
+        ilBody.Emit(OpCodes.Ldloc, symbol.Definition);
+    }
+    
+    
+    public void GenerateFunctionCall(FunctionCallAst call, 
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        if (call.Identifier.Name == "fmtPrintln")
+        {
+            GeneratePrintln(call, ilBody, method, symbols);
+            return;
+        }
+        var func = _functionSymbols[call.Identifier.Name]?.Method ?? throw new Exception($"Function with name {call.Identifier.Name} not found");
+
+        foreach (var parameter in call.Parameters)
+        {
+            GenerateExpression(parameter, ilBody, method, symbols);
+        }
+        ilBody.Emit(OpCodes.Call, func);
     }
 
     public void GenerateBinaryExpression(BinaryExpressionAst expression, ILProcessor ilBody,
@@ -159,9 +244,78 @@ public class GaleGenerator
     public void GenerateDeclaration(DeclarationStatementAst declaration, ILProcessor ilBody,
         MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
+        var variable = new VariableDefinition(declaration.Type.GetTypeReference(_assembly)); //TODO: NEED TYPE
+        method.Body.Variables.Add(variable);
         if (declaration.Expression is not null)
             GenerateExpression(declaration.Expression, ilBody, method, symbols);
-        var lv_a_8 = new VariableDefinition(_assembly.MainModule.TypeSystem.Int32); //TODO: NEED TYPE
-        //md_Main_6.Body.Variables.Add(lv_a_8);
+        ilBody.Emit(OpCodes.Stloc, variable);
+        symbols[declaration.Identifier.Name] = new VariableSymbol()
+        {
+            Definition = variable,
+            Identifier = declaration.Identifier.Name,
+            IsOutOfScope = false,
+            Type = declaration.Type
+        };
+    }
+    
+    public void GeneratePrintln(FunctionCallAst call, 
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        var types = new string[] { };
+        foreach (var parameter in call.Parameters)
+        {
+            GenerateExpression(parameter, ilBody, method, symbols);
+            var type = GetExpressionType(parameter, symbols);
+            if (type == "int")
+            {
+                types = [.. types, "System.Int32"];
+            }
+            else
+            {
+                types = [.. types, "System.String"];
+            }
+        }
+        ilBody.Emit(OpCodes.Call, _assembly.MainModule.ImportReference(TypeHelpers
+            .ResolveMethod(typeof(System.Console), "WriteLine",
+                System.Reflection.BindingFlags.Default|System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.Public, 
+                types)));
+        //ilBody.Emit(OpCodes.Call, writeLineRef);
+    }
+
+    public string GetExpressionType(ExpressionAst expression, Dictionary<string, VariableSymbol> symbols)
+    {
+        switch (expression)
+        {
+            case IntegerLiteral:
+                return "int";
+            case StringLiteral:
+                return "string";
+            case BinaryExpressionAst binary:
+                var leftType = GetExpressionType(binary.LeftOperand, symbols);
+                var rightType = GetExpressionType(binary.RightOperand, symbols);
+                if (leftType != rightType)
+                    throw new Exception($"Binary expression exception: {leftType} != {rightType}");
+                //GenerateBinaryExpression(binary, ilBody, method, symbols);
+                return leftType;
+                break;
+            case FunctionCallAst call:
+            {
+                if (call.Identifier.Name == "fmtPrintln") return "void";
+                _functionSymbols.TryGetValue(call.Identifier.Name, out var functionSymbol);
+                if (functionSymbol == null) throw new Exception($"Function {call.Identifier.Name} not found");
+                return functionSymbol.ReturnedType;
+            }
+            case IdentifierAst identifier:
+            {
+                symbols.TryGetValue(identifier.Name, out var variableSymbol);
+                if (variableSymbol == null) throw new Exception($"Variable {identifier.Name} not found");
+                //identifier.Type;
+                return variableSymbol.Type;
+                break;
+            } case null:
+                return "void";
+        }
+
+        throw new Exception("Type undefined");
     }
 }

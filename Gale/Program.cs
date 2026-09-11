@@ -37,14 +37,9 @@ class Program
         };
 
         var gale = new GaleGenerator(mp, "Filename.exe");
-
-        var assembly = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("Foo", Version.Parse("1.0.0.0")),
-            Path.GetFileName("Foo.dll"), mp);
-
-        var mainProgram = new TypeDefinition("main", "Program", 
-            TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, 
-            assembly.MainModule.TypeSystem.Object);
         
+        var assembly = gale.GenerateProgram((SourceFileAst)ast);
+        assembly.Write("Filename.exe");
         //var Gale = new GaleGenerator(assembly);
         //Gale.AddFunctionToPackage(mainProgram, new FunctionAst(){Identifier = "main", Body = (BlockAst)ast});
     }
@@ -58,6 +53,5 @@ class Program
             Console.WriteLine( new string(' ', tabs) + child.GetType().FullName + "\t" + child.ToString() + "\t" + child.Payload);
             PrintIParseTree(child, tabs + 1);
         }
-        
     }
 }

@@ -1,5 +1,8 @@
 namespace Gale.AST;
 
+public abstract class StatementAst : AstNode;
+public abstract class OperandAst : ExpressionAst;
+public abstract class Literal : OperandAst;
 
 public class SourceFileAst : AstNode
 {
@@ -27,20 +30,9 @@ public class ParameterAst : AstNode
     public string Type { get; set; }
 }
 
-public abstract class StatementAst : AstNode
-{
-    //public List<ExpressionAst> Expressions { get; set; } = new List<ExpressionAst>();
-}
+public class ExpressionStatementAst : StatementAst { public ExpressionAst ExpressionAst { get; set; } }
 
-public class ExpressionStatementAst : StatementAst
-{
-    public ExpressionAst ExpressionAst { get; set; }
-}
-
-public class MassAssigmentStatementAst : StatementAst
-{
-    public List<AssigmentStatementAst> Assigments { get; set; } = new List<AssigmentStatementAst>();
-}
+public class MassAssigmentStatementAst : StatementAst { public List<AssigmentStatementAst> Assigments { get; set; } = new(); }
 
 public class AssigmentStatementAst : StatementAst
 {
@@ -55,14 +47,20 @@ public class DeclarationStatementAst : StatementAst
     public ExpressionAst? Expression { get; set; }
 }
 
+public class ReturnStatementAst : StatementAst
+{
+    public bool IsNoReturn { get; set; } = true;
+    public ExpressionAst? ReturnedExpression { get; set; }
+}
+
 public class MassDeclarationStatementAst : StatementAst
 {
     public List<DeclarationStatementAst> Declarations { get; set; } = new List<DeclarationStatementAst>();
 }
 
-public class ExpressionAst : AstNode
+public abstract class ExpressionAst : AstNode
 {
-    
+    public abstract string GetExpressionType();
 }
 
 public class BinaryExpressionAst : ExpressionAst
@@ -70,39 +68,79 @@ public class BinaryExpressionAst : ExpressionAst
     public ExpressionAst LeftOperand { get; set; }
     public ExpressionAst RightOperand { get; set; }
     public BinaryExpressionType Operation { get; set; }
+
+    public override string GetExpressionType()
+    {
+        var left = LeftOperand.GetExpressionType();
+        var right = RightOperand.GetExpressionType();
+        if (left != right) throw new Exception($"Binary expression error: {left} != {right}");
+        return left ?? right;
+    }
 }
 
 public enum BinaryExpressionType
 {
-    Plus,
-    Minus,
-    Mul,
-    Div,
-    //TODO: Add logic
+    Plus,        // +
+    Minus,       // -
+    Mul,         // *
+    Div,         // /
+    Mod,         // %
+    
+    BitwiseAnd,  // &
+    BitwiseOr,   // |
+    LShift,      // <<
+    RShift,      // >>
+    
+    Equals,        // ==
+    NotEquals,     // !=
+    Less,          // <
+    LessOrEquals,  // <=
+    Greater,       // >
+    GreaterOrEquals, // >=
+    
+    LogicalAnd,  // &&
+    LogicalOr,   // ||
+    
+    Receive,     // <-
 }
 
 public class FunctionCallAst : ExpressionAst
 {
     public IdentifierAst Identifier { get; set; }
+    public string ReturnedType { get; set; } = "undefined";
     public List<ExpressionAst> Parameters { get; set; } = new List<ExpressionAst>();
+    public override string GetExpressionType()
+    {
+        return ReturnedType;
+    }
 }
 
-public abstract class OperandAst : ExpressionAst;
 public class IdentifierAst : OperandAst
 {
     public string Name { get; set; }
+    public string Type { get; set; } = "undefined";
 
     public List<string> QualifiedIdentifiers { get; set; } = new List<string>();
     //TYPE?
-}
-
-
-public abstract class Literal : OperandAst
-{
-    
+    public override string GetExpressionType()
+    {
+        return Type;
+    }
 }
 
 public class IntegerLiteral : Literal
 {
     public long Value { get; set; }
+    public override string GetExpressionType()
+    {
+        return "int";
+    }
+}
+public class StringLiteral : Literal
+{
+    public string Value { get; set; }
+    public override string GetExpressionType()
+    {
+        return "string";
+    }
 }
