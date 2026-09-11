@@ -160,15 +160,30 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         foreach (var varSpec in varSpecs)
         {
             var identifierList = varSpec.identifierList().IDENTIFIER();
-            var expressionList = varSpec.expressionList().expression();
+            var expressionList = varSpec.expressionList()?.expression();
             var type = varSpec.type_();
             //var name = type.typeName();
             //var lit = type.typeLit();
             //var args = type.typeArgs();
             for (int i = 0; i < identifierList.Length; ++i)
             {
+                var arrayDecl = type.typeLit().arrayType();
+                if (arrayDecl != null)
+                {
+                    var arrDeclaration = new ArrayDeclarationStatementAst();
+                    arrDeclaration.Identifier = new IdentifierAst() { Name = identifierList[i].GetText() };
+                    arrDeclaration.Type = type.typeLit().arrayType().GetText();
+                    var typeLit = type.typeLit().arrayType().elementType();
+                    var elementType = typeLit?.type_()?.typeName().IDENTIFIER().GetText(); //TODO: add recursive call
+                    var count = ((IntegerLiteral)VisitExpression(type.typeLit().arrayType().arrayLength().expression())).Value;
+                    arrDeclaration.Type = elementType;
+                    arrDeclaration.Dimensions.Add((int)count);
+                    massDeclaration.Declarations.Add(arrDeclaration);
+                }
+                
                 var declaration = new DeclarationStatementAst();
                 declaration.Identifier = new IdentifierAst() { Name = identifierList[i].GetText() };
+                
                 declaration.Type = type.typeName()?.IDENTIFIER().GetText() ?? "";
                 if (expressionList.Length > i)
                 {

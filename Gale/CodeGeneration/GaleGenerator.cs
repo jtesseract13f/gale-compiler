@@ -3,6 +3,7 @@ using Gale.AST;
 using Gale.Helpers;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
+using Mono.Cecil.Rocks;
 using Mono.CompilerServices.SymbolWriter;
 
 namespace Gale.CodeGeneration;
@@ -21,6 +22,13 @@ public class VariableSymbol
     public bool IsOutOfScope { get; set; } = true;
     public VariableDefinition Definition { get; set; }
 }
+
+public class ParameterSymbol : VariableSymbol
+{
+    public ParameterDefinition ParameterDefinition { get; set; }
+    public int ParameterNumber { get; set; }
+}
+
 
 public class GaleGenerator
 {
@@ -89,6 +97,24 @@ public class GaleGenerator
         definition.Body.InitLocals = true;
         var ilBody = definition.Body.GetILProcessor();
         var symbolTable = new Dictionary<string, VariableSymbol>();
+        var count = 0;
+        foreach (var parameterAst in funcAst.Parameters)
+        {
+            var parameter = new ParameterDefinition(parameterAst.Name, 
+                ParameterAttributes.None, parameterAst.Type.GetTypeReference(_assembly));
+            definition.Parameters.Add(parameter);
+            var symbolVar = new ParameterSymbol()
+            {
+                ParameterDefinition = parameter,
+                Identifier = parameterAst.Name,
+                Type = parameterAst.Type,
+                ParameterNumber = count
+            };
+            ++count;
+            symbolTable[parameterAst.Name] = symbolVar;
+            //parameterAst.Type
+        }
+        //Parameters of 'public static int Get19(int p19, int p192){...'
         GenerateBlock(funcAst.Block, ilBody, definition, symbolTable);
 
         ilBody.Emit(OpCodes.Ret);
@@ -127,6 +153,7 @@ public class GaleGenerator
                 case ReturnStatementAst returnExpression:
                 {
                     if (!returnExpression.IsNoReturn) GenerateExpression(returnExpression.ReturnedExpression, ilBody, method, symbols);
+                    ilBody.Emit(OpCodes.Ret);
                     break;
                 }
                 case IfStatementAst ifStatement:
@@ -165,6 +192,10 @@ public class GaleGenerator
         {
             GenerateBlock(ifStatement.ElseStatement?.Block, ilBody, method, symbols);
         }
+        else
+        {
+            
+        }
         ilBody.Append(elseEnd);
         
     }
@@ -182,6 +213,12 @@ public class GaleGenerator
     {
         GenerateExpression(assigmentStmt.Expression, ilBody, method, symbols);
         var varSymbol = symbols[assigmentStmt.Identifier.Name];//TODO: add check
+        if (varSymbol is ParameterSymbol parameter)
+        {
+            ilBody.Emit(OpCodes.Starg_S, parameter.ParameterDefinition);
+            return;
+        }
+
         ilBody.Emit(OpCodes.Stloc,  varSymbol.Definition);
     }
 
@@ -218,9 +255,30 @@ public class GaleGenerator
     {
         symbols.TryGetValue(identifier.Name, out var symbol);
         if (symbol == null) throw new Exception("Unknown Variable");
+        if (symbol is ParameterSymbol parameter)
+        {
+            switch (parameter.ParameterNumber)
+            {
+                case 0:
+                    ilBody.Emit(OpCodes.Ldarg_0);
+                    break;
+                case 1: 
+                    ilBody.Emit(OpCodes.Ldarg_1);
+                    break;
+                case 2:
+                    ilBody.Emit(OpCodes.Ldarg_2);
+                    break;
+                case 3: 
+                    ilBody.Emit(OpCodes.Ldarg_3);
+                    break;
+                default:
+                    ilBody.Emit(OpCodes.Ldarg, parameter.ParameterNumber);
+                    break;
+            }
+            return;
+        }
         ilBody.Emit(OpCodes.Ldloc, symbol.Definition);
     }
-    
     
     public void GenerateFunctionCall(FunctionCallAst call, 
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
@@ -269,6 +327,11 @@ public class GaleGenerator
                 ilBody.Emit(OpCodes.Ldc_I4_0);
                 ilBody.Emit(OpCodes.Ceq);
                 break;
+            case BinaryExpressionType.LessOrEquals:
+                ilBody.Emit(OpCodes.Cgt);
+                ilBody.Emit(OpCodes.Ldc_I4_0);
+                ilBody.Emit(OpCodes.Ceq);
+                break;
             default:
                 throw new InvalidEnumArgumentException($"Not implemented {expression.LeftOperand} {expression.Operation} {expression.RightOperand}");
         }
@@ -281,6 +344,24 @@ public class GaleGenerator
         {
             GenerateDeclaration(declaration, ilBody, method, symbols);
         }
+    }
+
+    public void GenerateArrayDeclaration(ArrayDeclarationStatementAst declaration, ILProcessor ilBody,
+        MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        //var arr = new int[4, 5];
+        var arr = new VariableDefinition(declaration.Type.GetTypeReference(_assembly).MakeArrayType());
+        method.Body.Variables.Add(arr);
+        ilBody.Emit(OpCodes.Ldc_I4, declaration.Dimensions.First());
+        ilBody.Emit(OpCodes.Newarr, declaration.Type.GetTypeReference(_assembly));
+        ilBody.Emit(OpCodes.Stloc, arr);
+        symbols[declaration.Identifier.Name] = new VariableSymbol()
+        {
+            Definition = arr,
+            Identifier = declaration.Identifier.Name,
+            IsOutOfScope = false,
+            Type = "[]" + declaration.Type//??
+        };
     }
 
     public void GenerateDeclaration(DeclarationStatementAst declaration, ILProcessor ilBody,

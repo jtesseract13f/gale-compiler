@@ -47,6 +47,14 @@ public class DeclarationStatementAst : StatementAst
     public ExpressionAst? Expression { get; set; }
 }
 
+public class ArrayDeclarationStatementAst : DeclarationStatementAst
+{
+    public IdentifierAst Identifier { get; set; }
+    public string Type { get; set; }
+    public List<int> Dimensions { get; set; }
+    public ExpressionAst? Expression { get; set; }
+}
+
 public class ReturnStatementAst : StatementAst
 {
     public bool IsNoReturn { get; set; } = true;
@@ -59,6 +67,11 @@ public class IfStatementAst : StatementAst
     public BlockAst Block { get; set; }
     public IfStatementAst? IfStatement { get; set; }
     public IfStatementAst? ElseStatement { get; set; }
+}
+
+public class WhileStatementAst : StatementAst
+{
+    
 }
 public class MassDeclarationStatementAst : StatementAst
 {
