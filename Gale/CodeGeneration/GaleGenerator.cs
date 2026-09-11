@@ -129,6 +129,11 @@ public class GaleGenerator
                     if (!returnExpression.IsNoReturn) GenerateExpression(returnExpression.ReturnedExpression, ilBody, method, symbols);
                     break;
                 }
+                case IfStatementAst ifStatement:
+                {
+                    GenerateIfStatement(ifStatement, ilBody, method, symbols);
+                    break;
+                }
                 default:
                     throw new Exception($"Unknown statement {statement.GetType()}");
                     break;
@@ -137,6 +142,32 @@ public class GaleGenerator
         }
     }
 
+    public void GenerateIfStatement(IfStatementAst ifStatement,
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        if (ifStatement.BoolExpression != null)
+        {
+            GenerateExpression(ifStatement.BoolExpression, ilBody, method, symbols);
+        }
+        var elseEntryPoint = ilBody.Create(OpCodes.Nop);
+        ilBody.Emit(OpCodes.Brfalse, elseEntryPoint);
+        GenerateBlock(ifStatement.Block, ilBody, method, symbols);
+        
+        var elseEnd = ilBody.Create(OpCodes.Nop);
+        ilBody.Emit(OpCodes.Br, elseEnd);
+        ilBody.Append(elseEntryPoint);
+        
+        if (ifStatement.IfStatement != null)
+        {
+            GenerateIfStatement(ifStatement.IfStatement, ilBody, method, symbols);
+        }
+        else if (ifStatement.ElseStatement != null)
+        {
+            GenerateBlock(ifStatement.ElseStatement?.Block, ilBody, method, symbols);
+        }
+        ilBody.Append(elseEnd);
+        
+    }
     public void GenerateMassAssigment(MassAssigmentStatementAst assigmentStmt, ILProcessor ilBody,
         MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
@@ -227,6 +258,17 @@ public class GaleGenerator
             case BinaryExpressionType.Div:
                 ilBody.Emit(OpCodes.Div);
                 break;
+            case BinaryExpressionType.Greater:
+                ilBody.Emit(OpCodes.Cgt);
+                break;
+            case BinaryExpressionType.Equals:
+                ilBody.Emit(OpCodes.Ceq);
+                break;
+            case BinaryExpressionType.NotEquals:
+                ilBody.Emit(OpCodes.Ceq);
+                ilBody.Emit(OpCodes.Ldc_I4_0);
+                ilBody.Emit(OpCodes.Ceq);
+                break;
             default:
                 throw new InvalidEnumArgumentException($"Not implemented {expression.LeftOperand} {expression.Operation} {expression.RightOperand}");
         }
@@ -314,8 +356,8 @@ public class GaleGenerator
                 break;
             } case null:
                 return "void";
+            default:
+                throw new Exception("Type undefined");
         }
-
-        throw new Exception("Type undefined");
     }
 }

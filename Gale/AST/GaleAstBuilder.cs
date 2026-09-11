@@ -82,6 +82,10 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         }
         
         var ifStmt = context.ifStmt();
+        if (ifStmt != null)
+        {
+            return VisitIfStmt(ifStmt);
+        }
         var forStmt = context.forStmt();
         var labeledStmt = context.labeledStmt();
         var fallthroughStmt = context.fallthroughStmt();
@@ -96,6 +100,36 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var deferStmt = context.deferStmt();
         
         return base.VisitStatement(context);
+    }
+
+    public override AstNode VisitIfStmt(GoParser.IfStmtContext context)
+    {
+        var ifStmtAst = new IfStatementAst();
+        var simple = context.simpleStmt();
+        var ifstmt = context.ifStmt();
+        var blockIf = context.block();
+        if (ifstmt != null)
+        {
+            ifStmtAst.IfStatement = (IfStatementAst)VisitIfStmt(ifstmt);
+        }
+        
+        if (blockIf != null)
+        {
+            ifStmtAst.Block = (BlockAst)VisitBlock(blockIf[0]);
+            if (blockIf.Length == 2)
+            {
+                ifStmtAst.ElseStatement = new IfStatementAst()
+                {
+                    Block = (BlockAst)VisitBlock(blockIf[1]),
+                };
+            }
+        }
+        var expression = context.expression();
+        if (expression != null)
+        {
+            ifStmtAst.BoolExpression = (ExpressionAst)VisitExpression(expression);
+        }
+        return ifStmtAst;
     }
 
     public override AstNode VisitReturnStmt(GoParser.ReturnStmtContext context)

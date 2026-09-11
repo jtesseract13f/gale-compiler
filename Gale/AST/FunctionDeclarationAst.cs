@@ -53,6 +53,13 @@ public class ReturnStatementAst : StatementAst
     public ExpressionAst? ReturnedExpression { get; set; }
 }
 
+public class IfStatementAst : StatementAst
+{
+    public ExpressionAst? BoolExpression { get; set; }
+    public BlockAst Block { get; set; }
+    public IfStatementAst? IfStatement { get; set; }
+    public IfStatementAst? ElseStatement { get; set; }
+}
 public class MassDeclarationStatementAst : StatementAst
 {
     public List<DeclarationStatementAst> Declarations { get; set; } = new List<DeclarationStatementAst>();
