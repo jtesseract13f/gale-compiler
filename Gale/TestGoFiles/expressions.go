@@ -1,36 +1,24 @@
 package main
 
 import "fmt"
+import "container/list"
+
+type Person struct {
+    Name string
+    Age  int
+}
+
 func main(){
-    var myarr [2]int
-    myarr[1] = 0
-    var cnter int = recursionTest(3)
-    if 2 > 4 {
-        fmtPrintln("uno1-if")
-    } else {
-        fmtPrintln("uno1-else")
-    }
-
-    var uno int = 2 + 3 - 1 + 300
-    fmtPrintln("uno")
-    fmtPrintln(uno)
-    var f, h int = 32, 33
-    f, h = 12, 13
-    fmtPrintln(uno + f + h)
-}
-
-func get19() int {
-    return 19
-}
-
-func recursionTest(counter int) int {
+    var p Person = Person{"Анна", 30}
+    //var p Person = Person{Name: "Анна", Age: 30}
+    var mylist *list.List = list.New()
+    var ints []int = []int{10, 2, 85, 41, 5}
     
-    fmtPrintln(counter)
-    fmtPrintln(counter <= 1)
-    if (counter <= 1){
-        return get19()
-    }
+    l := list.New()
+    //animal.Name + 3
+    fmt.Println(mylist, l)
 
-    counter = counter - 1;
-    return recursionTest(counter)
+    //Print("hui")
+    //hive.getAnimal().Tail.Tailed[1:3].PrintTailed()[2:6]
+    //
 }

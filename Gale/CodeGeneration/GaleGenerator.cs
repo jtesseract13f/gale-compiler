@@ -4,31 +4,8 @@ using Gale.Helpers;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
-using Mono.CompilerServices.SymbolWriter;
 
 namespace Gale.CodeGeneration;
-
-public class FunctionSymbol
-{
-    public string Identifier { get; set; }
-    public string ReturnedType { get; set; }
-    public MethodDefinition? Method { get; set; }
-}
-
-public class VariableSymbol
-{
-    public string Identifier { get; set; }
-    public string Type { get; set; }
-    public bool IsOutOfScope { get; set; } = true;
-    public VariableDefinition Definition { get; set; }
-}
-
-public class ParameterSymbol : VariableSymbol
-{
-    public ParameterDefinition ParameterDefinition { get; set; }
-    public int ParameterNumber { get; set; }
-}
-
 
 public class GaleGenerator
 {
@@ -51,7 +28,6 @@ public class GaleGenerator
             TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit | TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, 
             _assembly.MainModule.TypeSystem.Object);
         _assembly.MainModule.Types.Add(_mainModule);
-
         foreach (var func in root.Functions)
         {
             var funcDefinition = new MethodDefinition(func.Name, 
@@ -111,8 +87,7 @@ public class GaleGenerator
                 ParameterNumber = count
             };
             ++count;
-            symbolTable[parameterAst.Name] = symbolVar;
-            //parameterAst.Type
+            //symbolTable[parameterAst.Name] = symbolVar;
         }
         //Parameters of 'public static int Get19(int p19, int p192){...'
         GenerateBlock(funcAst.Block, ilBody, definition, symbolTable);
@@ -161,12 +136,36 @@ public class GaleGenerator
                     GenerateIfStatement(ifStatement, ilBody, method, symbols);
                     break;
                 }
+                case WhileStatementAst whileStatement:
+                {
+                    GenerateWhileStatement(whileStatement, ilBody, method, symbols);
+                    break;
+                }
                 default:
                     throw new Exception($"Unknown statement {statement.GetType()}");
                     break;
             }
             //GenerateSimpleStatement(ilBody, method, symbols);
         }
+    }
+
+    public void GenerateWhileStatement(WhileStatementAst whileStatement,
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        var whileElseLabel = ilBody.Create(OpCodes.Nop);
+        var whileCondition = ilBody.Create(OpCodes.Nop);
+        ilBody.Append(whileCondition);
+        GenerateExpression(whileStatement.BoolExpression, ilBody, method, symbols);
+        ilBody.Emit(OpCodes.Brfalse, whileElseLabel);
+        //BLOCK CODE
+        GenerateBlock(whileStatement.Block, ilBody, method, symbols);
+        ilBody.Emit(OpCodes.Br, whileCondition);
+        ilBody.Append(whileElseLabel);
+    }
+
+    public void GenerateForStatement()
+    {
+        
     }
 
     public void GenerateIfStatement(IfStatementAst ifStatement,
@@ -211,11 +210,19 @@ public class GaleGenerator
     public void GenerateAssigment(AssigmentStatementAst assigmentStmt, 
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
-        GenerateExpression(assigmentStmt.Expression, ilBody, method, symbols);
         var varSymbol = symbols[assigmentStmt.Identifier.Name];//TODO: add check
-        if (varSymbol is ParameterSymbol parameter)
+        if (true && assigmentStmt.Identifier is ArrayIndexAst index)
         {
-            ilBody.Emit(OpCodes.Starg_S, parameter.ParameterDefinition);
+            ilBody.Emit(OpCodes.Ldloc, varSymbol.Definition);
+            //GenerateExpression(index.Index, ilBody, method, symbols);
+            GenerateExpression(assigmentStmt.Expression, ilBody, method, symbols);
+            ilBody.Emit(OpCodes.Stelem_I4); //TODO: add type changing 
+            return;
+        }
+        GenerateExpression(assigmentStmt.Expression, ilBody, method, symbols);
+        //if (varSymbol is ParameterSymbol parameter)
+        {
+            //ilBody.Emit(OpCodes.Starg_S, parameter.ParameterDefinition);
             return;
         }
 
@@ -241,6 +248,11 @@ public class GaleGenerator
                 GenerateFunctionCall(call, ilBody, method, symbols);
                 break;
             }
+            case ArrayIndexAst arrayElement:
+            {
+                GenerateArrayIndex(arrayElement, ilBody, method, symbols);
+                break ;
+            }
             case IdentifierAst identifier:
             {
                 GenerateIdentifier(identifier, ilBody, method, symbols);
@@ -250,12 +262,23 @@ public class GaleGenerator
         }
     }
 
+    public void GenerateArrayIndex(ArrayIndexAst identifier,
+        ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
+    {
+        symbols.TryGetValue(identifier.Name, out var symbol);
+        if (symbol == null) throw new Exception("Unknown Variable");
+        ilBody.Emit(OpCodes.Ldloc, symbol.Definition);
+        //GenerateExpression(identifier.Index, ilBody, method, symbols);
+        ilBody.Emit(OpCodes.Ldelem_I4);
+    }
+
     public void GenerateIdentifier(IdentifierAst identifier,
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
         symbols.TryGetValue(identifier.Name, out var symbol);
         if (symbol == null) throw new Exception("Unknown Variable");
-        if (symbol is ParameterSymbol parameter)
+        var parameter = new ParameterSymbol();
+        if (true)
         {
             switch (parameter.ParameterNumber)
             {
@@ -342,6 +365,11 @@ public class GaleGenerator
     {
         foreach (var declaration in massDeclaration.Declarations)
         {
+            if (declaration is ArrayDeclarationStatementAst arrDecl)
+            {
+                GenerateArrayDeclaration(arrDecl, ilBody, method, symbols);
+                continue;
+            }
             GenerateDeclaration(declaration, ilBody, method, symbols);
         }
     }
@@ -359,8 +387,9 @@ public class GaleGenerator
         {
             Definition = arr,
             Identifier = declaration.Identifier.Name,
-            IsOutOfScope = false,
-            Type = "[]" + declaration.Type//??
+            //IsOutOfScope = false,
+            Type = "[]" + declaration.Type, //??,
+            //IsArray = true
         };
     }
 
@@ -376,7 +405,7 @@ public class GaleGenerator
         {
             Definition = variable,
             Identifier = declaration.Identifier.Name,
-            IsOutOfScope = false,
+            //IsOutOfScope = false,
             Type = declaration.Type
         };
     }
@@ -428,6 +457,9 @@ public class GaleGenerator
                 if (functionSymbol == null) throw new Exception($"Function {call.Identifier.Name} not found");
                 return functionSymbol.ReturnedType;
             }
+            case ArrayIndexAst arrElement:
+                return arrElement.Type;
+                break;
             case IdentifierAst identifier:
             {
                 symbols.TryGetValue(identifier.Name, out var variableSymbol);

@@ -1,14 +1,43 @@
 package main
 
 import "fmt"
-
 func main(){
-    //main()
-    g += 12
-    var g int = hui();
-    fmt.Println(g) // ВЫЗОВ ФУНКЦИИ
+    var myarr [2]int
+    myarr[1] = 12
+    //fmtPrintln(myarr[1])
+    var i int = 1;
+    for i <= 10{
+        fmtPrintln(i)
+        i = i + 1
+    }
+    var cnter int = myarr[1] + 1
+    fmtPrintln(cnter)
+    if 2 > 4 {
+        fmtPrintln("uno1-if")
+    } else {
+        fmtPrintln("uno1-else")
+    }
+
+    var uno int = 2 + 3 - 1 + 300
+    fmtPrintln("uno")
+    fmtPrintln(uno)
+    var f, h int = 32, 33
+    f, h = 12, 13
+    fmtPrintln(uno + f + h)
 }
 
-func hui() int {
-    return 34;
+func get19() int {
+    return 19
+}
+
+func recursionTest(counter int) int {
+    
+    fmtPrintln(counter)
+    fmtPrintln(counter <= 1)
+    if (counter <= 1){
+        return get19()
+    }
+
+    counter = counter - 1;
+    return recursionTest(counter)
 }

@@ -3,6 +3,12 @@ namespace Gale.AST;
 public abstract class StatementAst : AstNode;
 public abstract class OperandAst : ExpressionAst;
 public abstract class Literal : OperandAst;
+public abstract class TypeAst : AstNode;
+
+public class StructType : TypeAst
+{
+    
+}
 
 public class SourceFileAst : AstNode
 {
@@ -51,7 +57,7 @@ public class ArrayDeclarationStatementAst : DeclarationStatementAst
 {
     public IdentifierAst Identifier { get; set; }
     public string Type { get; set; }
-    public List<int> Dimensions { get; set; }
+    public List<int> Dimensions { get; set; } = [];
     public ExpressionAst? Expression { get; set; }
 }
 
@@ -71,7 +77,30 @@ public class IfStatementAst : StatementAst
 
 public class WhileStatementAst : StatementAst
 {
-    
+    public ExpressionAst BoolExpression { get; set; }
+    public BlockAst Block { get; set; }
+}
+
+public class ForStatementAst : WhileStatementAst
+{
+    //public 
+}
+
+public class ShortVarDeclarationAst : StatementAst
+{
+    public ExpressionAst Expression { get; set; }
+    public IdentifierAst Identifier { get; set; }
+    public string Type { get; set; }
+}
+
+public class ArrayIndexAst : IdentifierAst
+{
+    public List<ExpressionAst> Indexes { get; set; } = new List<ExpressionAst>();
+    //TYPE?
+    public override string GetExpressionType()
+    {
+        return Type;
+    }
 }
 public class MassDeclarationStatementAst : StatementAst
 {
@@ -163,4 +192,21 @@ public class StringLiteral : Literal
     {
         return "string";
     }
+}
+//POINTERS, INTERFACES, STRUCTS, METHODS
+
+public class InterfaceDeclarationAst : AstNode
+{
+    
+}
+
+public class StructDeclarationAst : AstNode
+{
+    //identifier
+    //struct fields
+}
+
+public class MethodDeclarationAst : AstNode
+{
+    
 }
