@@ -4,10 +4,38 @@ public abstract class StatementAst : AstNode;
 public abstract class OperandAst : ExpressionAst;
 public abstract class Literal : OperandAst;
 public abstract class TypeAst : AstNode;
+public abstract class FieldDeclarationAst : AstNode;
 
-public class StructType : TypeAst
+public class IdentifierTypeAst : TypeAst
 {
-    
+    public string Name { get; set; }
+    public List<string> QualifiedIdentifiers { get; set; } = [];
+}
+public class StructTypeAst : TypeAst
+{
+    public List<FieldDeclarationAst> Fields { get; set; } = [];
+}
+
+public class ArrayTypeAst : TypeAst
+{
+    public TypeAst ElementType { get; set; }
+    public ExpressionAst Length { get; set; }
+}
+
+public class PointerTypeAst : TypeAst
+{
+    public TypeAst PointedType { get; set; }
+}
+
+public class NamedFieldDeclaratonAst : FieldDeclarationAst{
+    public TypeAst FieldType { get; set; }
+    public string Identifier { get; set; }
+}
+
+public class EmbeddedFieldDeclarationAst : FieldDeclarationAst
+{
+    public IdentifierTypeAst TypeName { get; set; }
+    //typeArgAst
 }
 
 public class SourceFileAst : AstNode
@@ -177,22 +205,7 @@ public class IdentifierAst : OperandAst
     }
 }
 
-public class IntegerLiteral : Literal
-{
-    public long Value { get; set; }
-    public override string GetExpressionType()
-    {
-        return "int";
-    }
-}
-public class StringLiteral : Literal
-{
-    public string Value { get; set; }
-    public override string GetExpressionType()
-    {
-        return "string";
-    }
-}
+
 //POINTERS, INTERFACES, STRUCTS, METHODS
 
 public class InterfaceDeclarationAst : AstNode

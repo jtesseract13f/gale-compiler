@@ -16,7 +16,7 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var declarations = context.declaration();
         foreach (var declaration in declarations)
         {
-            //var declarationAst = VisitDeclaration(declaration);
+            var declarationAst = VisitDeclaration(declaration);
             //var type = declaration.typeDecl().typeSpec()[0];
         }
         foreach (var function in functions)
@@ -44,30 +44,31 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         {
             var identifiers = parameter.identifierList().IDENTIFIER();
             var type = parameter.type_();
+            if (type != null)
+            {
+                var typeNameAst = VisitType_(type);
+            }
             foreach (var id in identifiers)
             {
-                var parameterAst = new ParameterAst(){
-                    Name = id.GetText(), 
-                    Type = type.typeName().IDENTIFIER().GetText()};
-                func.Parameters.Add(parameterAst);
+                //var parameterAst = new ParameterAst(){
+                //    Name = id.GetText(), 
+                //    Type = type.typeName().IDENTIFIER().GetText()};
+                
+                //func.Parameters.Add(parameterAst);
             }
         }
-        var result = context?.signature()?.result()?.type_()?.typeName();
+        var result = context?.signature()?.result()?.type_();
         if (result != null)
         {
-            var returnType =  context?.signature()?.result().type_().typeName().IDENTIFIER().GetText() ?? "void";
-            func.ReturnType = returnType;
-            var qualifiedIdent = context?.signature()?.result()?.type_()?.typeName()?.qualifiedIdent()?.IDENTIFIER() ?? [];
+            var resultAst = VisitType_(result);
+            //var returnType =  context?.signature()?.result().type_().typeName().IDENTIFIER().GetText() ?? "void";
+            //func.ReturnType = returnType;
+            //var qualifiedIdent = context?.signature()?.result()?.type_()?.typeName()?.qualifiedIdent()?.IDENTIFIER() ?? [];
             //foreach (var terminal in qualifiedIdent) { }
         }
         return func;
     }
-
-    public override AstNode VisitParameterDecl(GoParser.ParameterDeclContext context)
-    {
-        return base.VisitParameterDecl(context);
-    }
-
+    
     public override AstNode VisitBlock(GoParser.BlockContext context)
     {
         var blockAst = new BlockAst();
@@ -182,8 +183,42 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         
         var constDecl = context.constDecl();
         var typeDecl = context.typeDecl();
+        if (typeDecl != null)
+        {
+            return VisitTypeDecl(typeDecl);
+        }
         
         return base.VisitDeclaration(context);
+    }
+
+    public override AstNode VisitTypeDecl(GoParser.TypeDeclContext context)
+    {
+        var typeSpecs = context.typeSpec();
+        foreach (var typeSpec in typeSpecs)
+        {
+            //return VisitTypeSpec(typeSpec);
+        }
+        //return VisitTypeSpec();
+        //context.
+        return null;
+    }
+
+    public override AstNode VisitTypeSpec(GoParser.TypeSpecContext context)
+    {
+        var typeDef = context.typeDef();
+        if (typeDef != null)
+        {
+            var type = typeDef.type_();
+            if (type != null)
+            {
+                VisitType_(type);
+            }
+            var identifier = typeDef.IDENTIFIER();
+            var typeParameters = typeDef.typeParameters();
+        }
+        context.aliasDecl();
+        //context.
+        return base.VisitTypeSpec(context);
     }
 
     public override AstNode VisitVarDecl(GoParser.VarDeclContext context)
@@ -233,33 +268,115 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
     public override AstNode VisitType_(GoParser.Type_Context context)
     {
         var type = context.type_();
-        var name = context.typeName();
         var typeArgs = context.typeArgs();
         var typeLit = context.typeLit();
         if (typeLit != null)
         {
-            var structType = typeLit.structType();
-            if (structType != null)
-            {
-                VisitStructType(structType);
-            }
-            var sliceType = typeLit.sliceType(); //TODO: Add functions for literals
-            var pointerType = typeLit.pointerType();
-            var channelType = typeLit.channelType();
-            var arrayType = typeLit.arrayType();
-            var functionType = typeLit.functionType();
+            var typeLitAst = VisitTypeLit(typeLit);
+            return typeLitAst;
         }
         var typeName = context.typeName();
+        if (typeName != null)
+        {
+            return VisitTypeName(typeName);
+        }
         
         return base.VisitType_(context);
     }
 
+    public override AstNode VisitTypeLit(GoParser.TypeLitContext context)
+    {
+        var structType = context.structType();
+        if (structType != null)
+        {
+            return VisitStructType(structType);
+        }
+        var arrayType = context.arrayType();
+        if (arrayType != null)
+        {
+            return VisitArrayType(arrayType);
+        }
+        var pointerType = context.pointerType();
+        if (pointerType != null)
+        {
+            return VisitPointerType(pointerType);
+        }
+        var sliceType = context.sliceType(); //TODO: Add functions for literals
+        var channelType = context.channelType();
+        var functionType = context.functionType();
+        var interfaceType = context.interfaceType();
+        var mapType = context.mapType();
+        return base.VisitTypeLit(context);
+    }
+
+    public override AstNode VisitPointerType(GoParser.PointerTypeContext context)
+    {
+        return new PointerTypeAst()
+        {
+            PointedType = (TypeAst)VisitType_(context.type_())
+        };
+    }
+
+    public override AstNode VisitArrayType(GoParser.ArrayTypeContext context)
+    {
+        var arrayTypeAst = new ArrayTypeAst();
+        var elementType = context.elementType();
+        if (elementType != null)
+        {
+            var elementTypeAst = (TypeAst)VisitType_(elementType.type_());
+            arrayTypeAst.ElementType = elementTypeAst;
+        }
+        var arrayLength = context.arrayLength();
+        if (arrayLength != null)
+        {
+            arrayTypeAst.Length = (ExpressionAst)VisitExpression(arrayLength.expression());
+        }
+        return arrayTypeAst;
+    }
 
     public override AstNode VisitStructType(GoParser.StructTypeContext context)
     {
+        var structType = new StructTypeAst();
         var fieldDecl = context.fieldDecl();
-        //context.
-        return base.VisitStructType(context);
+        foreach (var field in fieldDecl)
+        {
+            var fieldAst = (FieldDeclarationAst)VisitFieldDecl(field);
+            structType.Fields.Add(fieldAst);
+        }
+        return structType;
+    }
+
+    public override AstNode VisitFieldDecl(GoParser.FieldDeclContext context)
+    {
+        var embeddedField = context.embeddedField();
+        if (embeddedField != null)
+        {
+            var embeddedFieldAst = new EmbeddedFieldDeclarationAst();
+            var typeArgs = embeddedField.typeArgs();
+            if (typeArgs != null)
+            {
+                //var typeArgAst = VisitTypeArgs(typeArgs);
+            }
+            var typeName = embeddedField.typeName();
+            if (typeName != null)
+            {
+                var typeNameAst = VisitTypeName(typeName);
+                embeddedFieldAst.TypeName = (IdentifierTypeAst)typeNameAst;
+            }
+            return embeddedFieldAst;
+        }
+        //var stringContext = context.string_();
+        var type = context.type_();
+        if (type != null)
+        {
+            var namedFieldAst = new NamedFieldDeclaratonAst();
+            var typeAst = (TypeAst)VisitType_(type);
+            namedFieldAst.FieldType = typeAst;
+            namedFieldAst.Identifier = context.identifierList().IDENTIFIER()[0].GetText();
+            return namedFieldAst;
+        }
+        //var tag = context.tag;
+        return base.VisitFieldDecl(context);
     }
 
     public override AstNode VisitSimpleStmt(GoParser.SimpleStmtContext context)
@@ -328,7 +445,11 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
         var operand = context.operand();
         if (operand != null)
         {
-            VisitOperand(operand);
+            var identifier = context?.IDENTIFIER();
+            var typeArgs = operand.typeArgs();
+            var literal = operand.literal();
+            var expression = operand.expression();
+            var operandAst = (OperandAst)VisitOperand(operand);
         }
         //ONE EXPRESSION
         for (int i = 0; i < context.ChildCount; ++i)
@@ -363,38 +484,67 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
                 //var 
             }
         }
-        var identifier2 = context.IDENTIFIER();
-        
-        var operand1 = context.operand();
-        if (operand1 != null)
-        {
-            var g = operand1.typeArgs();
-            var f = operand1.literal();
-            var h = operand1.operandName();
-            var j = operand1.expression();
-        }
-        
-        //context.
         
         return base.VisitPrimaryExpr(context);
+    }
+
+    public override AstNode VisitLiteralType(GoParser.LiteralTypeContext context)
+    {
+        var sliceType = context.sliceType();
+                
+        var structType = context.structType();
+        if (structType != null)
+        {
+            var structAst = VisitStructType(structType);
+            return structAst;
+        }
+        var arrayType = context.arrayType();
+        if (arrayType != null)
+        {
+            var arrayAst = VisitArrayType(arrayType);
+            return arrayAst;
+        }
+        var typeArgs = context.typeArgs();
+        if (typeArgs != null)
+        {
+            var typeArgsAst = VisitTypeArgs(typeArgs);
+        }
+        var typeName = context.typeName();
+        if (typeName != null)
+        {
+            var typeNameAst = VisitTypeName(typeName);
+            return typeNameAst;
+        }
+        return base.VisitLiteralType(context);
+    }
+
+    public override AstNode VisitTypeName(GoParser.TypeNameContext context)
+    {
+        var identifier = context.IDENTIFIER();
+        var qualifiedIdent = context?.qualifiedIdent()?.IDENTIFIER() ?? [];
+        return new IdentifierTypeAst()
+        {
+            Name = identifier.GetText(),
+            QualifiedIdentifiers = qualifiedIdent.Select(x => x.GetText()).ToList()
+        };
     }
 
     public override AstNode VisitLiteral(GoParser.LiteralContext context)
     {
         var basicLit = context.basicLit();
-        var functionLit = context.functionLit();
+        if (basicLit != null)
+        {
+            return VisitBasicLit(basicLit);
+        }
         var compositeLit = context.compositeLit();
         if (compositeLit != null)
         {
-            
+            var compositeLiteral = new CompositeLiteral();
             var literalType = compositeLit.literalType();
             if (literalType != null)
             {
-                var sliceType = literalType.sliceType(); //TODO: add literals
-                var structType = literalType.structType();
-                var arrayType = literalType.arrayType();
-                var typeArgs = literalType.typeArgs();
-                var typeName = literalType.typeName();
+                var literalTypeAst = VisitLiteralType(literalType);
+                compositeLiteral.Type = (TypeAst)literalTypeAst;
             }
             var literalValue = compositeLit.literalValue();
             if (literalValue != null)
@@ -403,45 +553,70 @@ public class GaleAstBuilder : GoParserBaseVisitor<AstNode>
                 var keyElements = elementList.keyedElement();
                 foreach (var keyElement in keyElements)
                 {
+                    var elementAst = new Element();
                     var key = keyElement.key();
                     if (key != null)
                     {
                         var keyExpression = key.expression();
                         //var keyLiteralValue = key.literalValue();
-                        //var keyElementList = keyLiteralValue.elementList();
+                        elementAst.KeyExpression = (ExpressionAst)VisitExpression(keyExpression);
                     }
-                    
                     var element = keyElement.element();
                     if (element != null)
                     {
                         var expression = element.expression();
                         //var elementLiteralValue = element.literalValue();
+                        elementAst.KeyExpression = (ExpressionAst)VisitExpression(expression);
                     }
-                    //element.
+                    compositeLiteral.Elements.Add(elementAst);
                 }
-                //elementList.
             }
+
+            return compositeLiteral;
         }
+        
+        var functionLit = context.functionLit();
+        
         return base.VisitLiteral(context);
     }
 
+    public override AstNode VisitLiteralValue(GoParser.LiteralValueContext context)
+    {
+        
+        return base.VisitLiteralValue(context);
+    }
+
+    //only one operand
     public override AstNode VisitOperand(GoParser.OperandContext context)
     {
         var operandName = context.operandName();
         if (operandName != null)
         {
-
+            var identifierAst = VisitOperandName(operandName);
+            return identifierAst;
         }
         var literal = context.literal();
         if (literal != null)
         {
-            VisitLiteral(literal);
+            var literalAst = VisitLiteral(literal);
+            return literalAst;
         }
-        context.typeArgs();
+        var typeArgs = context.typeArgs();//??
         var expression = context.expression();
         if (expression != null) return VisitExpression(expression);
         //context.
         return null;
+    }
+
+    public override AstNode VisitOperandName(GoParser.OperandNameContext context)
+    {
+        var qualifiedIdent = context?.qualifiedIdent()?.IDENTIFIER() ?? [];
+        var identifier = context?.IDENTIFIER()?.GetText() ?? "";
+        return new IdentifierAst()
+        {
+            QualifiedIdentifiers = qualifiedIdent.Select(x => x.GetText()).ToList(),
+            Name = identifier
+        };
     }
 
     public override AstNode VisitBasicLit(GoParser.BasicLitContext context)
