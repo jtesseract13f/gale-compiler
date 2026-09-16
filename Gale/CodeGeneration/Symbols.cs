@@ -41,7 +41,7 @@ public abstract class Symbol
 public class StructSymbol : Symbol
 {
     public string TypeName { get; set; }
-    public Dictionary<string, StructField> Field { get; set; } = new();
+    public Dictionary<string, StructField> Fields { get; set; } = new();
     public VariableDefinition Definition { get; set; }
 }
 

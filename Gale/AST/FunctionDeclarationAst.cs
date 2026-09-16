@@ -5,13 +5,15 @@ public abstract class OperandAst : ExpressionAst;
 public abstract class Literal : OperandAst;
 public abstract class TypeAst : AstNode;
 public abstract class FieldDeclarationAst : AstNode;
+public abstract class DeclarationAst : AstNode;
 
 public class IdentifierTypeAst : TypeAst
 {
     public string Name { get; set; }
     public List<string> QualifiedIdentifiers { get; set; } = [];
 }
-public class StructTypeAst : TypeAst
+
+public class StructTypeAst : TypeAst //??
 {
     public List<FieldDeclarationAst> Fields { get; set; } = [];
 }
@@ -44,13 +46,14 @@ public class SourceFileAst : AstNode
     public List<string> Packages { get; set; } = new();
     public string ModuleName { set; get; }
     public FunctionDeclarationAst? Main { get; set; }
+    public List<DeclarationAst> Declarations { get; set; } = [];
 }
 public class FunctionDeclarationAst : AstNode
 {
     public string Name { get; set; }
     public BlockAst? Block { get; set; }
     public List<ParameterAst> Parameters { get; set; } = new List<ParameterAst>();
-    public string ReturnType { get; set; } = "void";
+    public TypeAst? ReturnType { get; set; }
 }
 
 public class BlockAst : AstNode
@@ -61,7 +64,7 @@ public class BlockAst : AstNode
 public class ParameterAst : AstNode
 {
     public string Name { get; set; }
-    public string Type { get; set; }
+    public TypeAst Type { get; set; }
 }
 
 public class ExpressionStatementAst : StatementAst { public ExpressionAst ExpressionAst { get; set; } }
@@ -77,17 +80,10 @@ public class AssigmentStatementAst : StatementAst
 public class DeclarationStatementAst : StatementAst
 {
     public IdentifierAst Identifier { get; set; }
-    public string Type { get; set; }
+    public TypeAst Type { get; set; }
     public ExpressionAst? Expression { get; set; }
 }
 
-public class ArrayDeclarationStatementAst : DeclarationStatementAst
-{
-    public IdentifierAst Identifier { get; set; }
-    public string Type { get; set; }
-    public List<int> Dimensions { get; set; } = [];
-    public ExpressionAst? Expression { get; set; }
-}
 
 public class ReturnStatementAst : StatementAst
 {
@@ -121,15 +117,6 @@ public class ShortVarDeclarationAst : StatementAst
     public string Type { get; set; }
 }
 
-public class ArrayIndexAst : IdentifierAst
-{
-    public List<ExpressionAst> Indexes { get; set; } = new List<ExpressionAst>();
-    //TYPE?
-    public override string GetExpressionType()
-    {
-        return Type;
-    }
-}
 public class MassDeclarationStatementAst : StatementAst
 {
     public List<DeclarationStatementAst> Declarations { get; set; } = new List<DeclarationStatementAst>();
@@ -183,12 +170,33 @@ public enum BinaryExpressionType
 
 public class FunctionCallAst : ExpressionAst
 {
+    public string? PackageName { get; set; }
     public IdentifierAst Identifier { get; set; }
     public string ReturnedType { get; set; } = "undefined";
-    public List<ExpressionAst> Parameters { get; set; } = new List<ExpressionAst>();
+    public List<ExpressionAst> Parameters { get; set; } = [];
     public override string GetExpressionType()
     {
         return ReturnedType;
+    }
+}
+
+public class StructFieldExpressionAst : ExpressionAst
+{
+    public string StructFieldName { get; set; }
+    public string Identifier { get; set; }
+    public override string GetExpressionType()
+    {
+        throw new NotImplementedException();
+    }
+}
+
+public class ArrayIndexExpressionAst : ExpressionAst
+{
+    public IdentifierAst ArrayName { get; set; }
+    public List<ExpressionAst> Indexes { get; set; } = []; 
+    public override string GetExpressionType()
+    {
+        throw new NotImplementedException();
     }
 }
 
@@ -206,20 +214,23 @@ public class IdentifierAst : OperandAst
 }
 
 
+
 //POINTERS, INTERFACES, STRUCTS, METHODS
 
-public class InterfaceDeclarationAst : AstNode
+public class InterfaceDeclarationAst : DeclarationAst
 {
     
 }
 
-public class StructDeclarationAst : AstNode
+public class StructDeclarationAst : DeclarationAst
 {
+    public StructTypeAst Type { get; set; }
+    public string Name { get; set; }
     //identifier
     //struct fields
 }
 
-public class MethodDeclarationAst : AstNode
+public class MethodDeclarationAst : DeclarationAst
 {
     
 }

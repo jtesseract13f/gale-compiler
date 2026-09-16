@@ -118,7 +118,7 @@ public class GaleGenerator
                     break;
                 }
                 case DeclarationStatementAst declaration:
-                    GenerateDeclaration(declaration, ilBody, method, symbols);
+                    //GenerateDeclaration(declaration, ilBody, method, symbols);
                     break;
                 case ExpressionStatementAst expression:
                 {
@@ -211,7 +211,7 @@ public class GaleGenerator
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
         var varSymbol = symbols[assigmentStmt.Identifier.Name];//TODO: add check
-        if (true && assigmentStmt.Identifier is ArrayIndexAst index)
+        //if (true && assigmentStmt.Identifier is ArrayIndexExpressionAst index)
         {
             ilBody.Emit(OpCodes.Ldloc, varSymbol.Definition);
             //GenerateExpression(index.Index, ilBody, method, symbols);
@@ -247,8 +247,9 @@ public class GaleGenerator
             {
                 GenerateFunctionCall(call, ilBody, method, symbols);
                 break;
-            }
-            case ArrayIndexAst arrayElement:
+            }//ArrayIndexExpressionAst
+            //StructFieldExpressionAst
+            case ArrayIndexExpressionAst arrayElement:
             {
                 GenerateArrayIndex(arrayElement, ilBody, method, symbols);
                 break ;
@@ -262,10 +263,10 @@ public class GaleGenerator
         }
     }
 
-    public void GenerateArrayIndex(ArrayIndexAst identifier,
+    public void GenerateArrayIndex(ArrayIndexExpressionAst identifier,
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
     {
-        symbols.TryGetValue(identifier.Name, out var symbol);
+        symbols.TryGetValue(identifier.ArrayName.Name, out var symbol);
         if (symbol == null) throw new Exception("Unknown Variable");
         ilBody.Emit(OpCodes.Ldloc, symbol.Definition);
         //GenerateExpression(identifier.Index, ilBody, method, symbols);
@@ -365,50 +366,15 @@ public class GaleGenerator
     {
         foreach (var declaration in massDeclaration.Declarations)
         {
-            if (declaration is ArrayDeclarationStatementAst arrDecl)
+            //if (declaration is ArrayDeclarationStatementAst arrDecl)
             {
-                GenerateArrayDeclaration(arrDecl, ilBody, method, symbols);
+                //GenerateArrayDeclaration(arrDecl, ilBody, method, symbols);
                 continue;
             }
-            GenerateDeclaration(declaration, ilBody, method, symbols);
+            //GenerateDeclaration(declaration, ilBody, method, symbols);
         }
     }
-
-    public void GenerateArrayDeclaration(ArrayDeclarationStatementAst declaration, ILProcessor ilBody,
-        MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
-    {
-        //var arr = new int[4, 5];
-        var arr = new VariableDefinition(declaration.Type.GetTypeReference(_assembly).MakeArrayType());
-        method.Body.Variables.Add(arr);
-        ilBody.Emit(OpCodes.Ldc_I4, declaration.Dimensions.First());
-        ilBody.Emit(OpCodes.Newarr, declaration.Type.GetTypeReference(_assembly));
-        ilBody.Emit(OpCodes.Stloc, arr);
-        symbols[declaration.Identifier.Name] = new VariableSymbol()
-        {
-            Definition = arr,
-            Identifier = declaration.Identifier.Name,
-            //IsOutOfScope = false,
-            Type = "[]" + declaration.Type, //??,
-            //IsArray = true
-        };
-    }
-
-    public void GenerateDeclaration(DeclarationStatementAst declaration, ILProcessor ilBody,
-        MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
-    {
-        var variable = new VariableDefinition(declaration.Type.GetTypeReference(_assembly)); //TODO: NEED TYPE
-        method.Body.Variables.Add(variable);
-        if (declaration.Expression is not null)
-            GenerateExpression(declaration.Expression, ilBody, method, symbols);
-        ilBody.Emit(OpCodes.Stloc, variable);
-        symbols[declaration.Identifier.Name] = new VariableSymbol()
-        {
-            Definition = variable,
-            Identifier = declaration.Identifier.Name,
-            //IsOutOfScope = false,
-            Type = declaration.Type
-        };
-    }
+    
     
     public void GeneratePrintln(FunctionCallAst call, 
         ILProcessor ilBody, MethodDefinition method, Dictionary<string, VariableSymbol> symbols)
@@ -457,8 +423,8 @@ public class GaleGenerator
                 if (functionSymbol == null) throw new Exception($"Function {call.Identifier.Name} not found");
                 return functionSymbol.ReturnedType;
             }
-            case ArrayIndexAst arrElement:
-                return arrElement.Type;
+            case ArrayIndexExpressionAst arrElement:
+                return "";
                 break;
             case IdentifierAst identifier:
             {
